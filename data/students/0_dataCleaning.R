@@ -249,7 +249,7 @@ dd$numericExam <- as.numeric(as.factor(dd$appello))
 dd$numericItem <- as.numeric(as.factor(dd$domanda))
 
 dd$maxScore <- dd$score + 1
-dd[which(!dd$appello %in% appelli) , ]$maxScore <- 4
+## dd[which(!dd$appello %in% appelli) , ]$maxScore <- 4
 
 
 ## reshape
