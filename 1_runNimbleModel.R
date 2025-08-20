@@ -17,12 +17,12 @@ args <- R.utils::commandArgs(asValue=TRUE)
 ##-----------------------------------------##
 ## TMP - for testing the script
 ##-----------------------------------------##
-# args <- list()
-# args$model= "models/semiparametric/semi_2PL_2PL.R"
-# args$data = "data/osce/OSCE_Long.rds"
-# args$niter 		= 1000
-# args$nburnin 	= 500
-# args$nthin 		= 1
+args <- list()
+args$model= "models/PCM_model.R"
+args$data = "data/simulation/sim_scenario1.rds"
+args$niter 		= 1000
+args$nburnin 	= 500
+args$nthin 		= 1
 
 ##-----------------------------------------##
 ## Load libraries and functions
@@ -61,34 +61,29 @@ cat("##--------------------------------##\n")
 ## Read data 
 ## Note: constants and inits are defined within each model script
 
-Data 	<- readRDS(args$data)
+if(grepl("sim", args$data)) {
+	## simuled data contains also true values on simulation
+	simData 	<- readRDS(args$data)
 
-## check that the scores are a vector 
-if(!is.vector(Data$y)) {
-	Data$y <- as.vector(Data$y)
+	## matrix of scores
+	Y <- simData$data
+
+	## adjacency matrix - added in constants
+	W <- simData$W
+
 }
+
+## createa adjacency matrix 
+W_nimble = as.carAdjacency(W)
+
 ##---------------------------------------##
 ## Source model code, and definition of data, constants, inits
 source(args$model)
 ##---------------------------------------##
-## Modify inits - 
-## 1. initialize abilities  using standardized raw score
-## 2. in running the code on data, set up cluster inits and M = n_individuals
 
-## using Data: for each individual calculate the score given by each rater 
-
-scores 			<- as.vector(by(Data$y, as.factor(Data$PPi), function(x) sum(x), simplify = T))
-Sscores 		<- (scores - mean(scores))/sd(scores)
-inits$eta 	<- Sscores
-
-if(grepl("semi", args$model)) {
-	if(grepl("osce", args$data)) {
-		inits$zi 	<- kmeans(Sscores, 3)$cluster
-		inits$a 	<- 1        # gamma prior parameters
-		inits$b 	<- 3        # gamma prior parameters
-		constants$M <- 30
-	}
-}
+# scores 			<- 
+# Sscores 		<- (scores - mean(scores))/sd(scores)
+# inits$eta 	<- Sscores
 
 
 ##---------------------------------------------------##
