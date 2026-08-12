@@ -1,9 +1,12 @@
 ##-----------------------------------------#
-## last update: 
-## R version 
-## nimble version
+## last update: 2026-08-12
+## R version 4.5.3
+## nimble version 1.4.1
 ##-----------------------------------------#
 ## This scripts runs a nimble model
+##
+## Results are saved in
+##   <dirResults>/<data file name>/<model type>/<model file name>.rds
 ##-----------------------------------------#
 args <- R.utils::commandArgs(asValue=TRUE)
 
@@ -15,14 +18,35 @@ args <- R.utils::commandArgs(asValue=TRUE)
 ## nthin 				thinning (deafault is 1)
 ## dirResults	  (optional) path directory for results
 ##-----------------------------------------##
+## Interface with the model scripts in models/
+##
+## this script defines, before sourcing the model script:
+##   Y            matrix of scores, students x items, coded 1:K
+##   scores       raw scores per student (used to initialize the abilities)
+##   K            number of response categories
+##   W            adjacency matrix of the network
+##   W_nimble     as.carAdjacency(W)
+##   CM           as.carCM(...), the proper CAR parametrization
+##   Cmatrix      CAR_calcCmatrix(...), used to standardize the abilities
+##
+## each model script must define:
+##   modelCode    nimbleCode
+##   data         list of data for nimbleModel
+##   constants    list of constants for nimbleModel
+##   inits        list of initial values
+##   monitors     parameters to monitor
+##   abilityNode  (optional) node initialized with the raw scores,
+##                defaults to "theta"
+##-----------------------------------------##
 ## TMP - for testing the script
 ##-----------------------------------------##
-args <- list()
-args$model= "models/PCM_model.R"
-args$data = "data/simulation/sim_scenario1.rds"
-args$niter 		= 1000
-args$nburnin 	= 500
-args$nthin 		= 1
+# args <- list()
+# args$model= "models/PCM_model.R"
+# args$data = "data/simulation/sim_scenario1.rds"
+# args$niter 		= 10
+# args$nburnin 	= 5
+# args$nthin 		= 1
+
 
 ##-----------------------------------------##
 ## Load libraries and functions
@@ -33,7 +57,7 @@ library(here)
 ##-----------------------------------------##
 ## Set variables from args list
 ##-----------------------------------------##
-calcWAIC <- FALSE
+calcWAIC <- TRUE
 
 ## results directory
 if(is.null(args$dirResults)) dir <- "output" else dir <- args$dirResults
@@ -45,6 +69,7 @@ filename <- unlist(strsplit(basename(args$model), "[\\.]"))[1]
 MCMCcontrol 		<- list()
 MCMCcontrol$niter 	<- as.numeric(args$niter)
 MCMCcontrol$nburnin <- as.numeric(args$nburnin)
+if(is.null(args$nthin)) MCMCcontrol$nthin <- 1 else MCMCcontrol$nthin <- as.numeric(args$nthin)
 
 ## set seed based on slurm task id if available
 task_id <- Sys.getenv("SLURM_ARRAY_TASK_ID")
@@ -66,24 +91,37 @@ if(grepl("sim", args$data)) {
 	simData 	<- readRDS(args$data)
 
 	## matrix of scores
-	Y <- simData$data
+	Y 					<- simData$data + 1
+	## computing raw scores
+	scores 			<- rowSums(simData$data)
 
 	## adjacency matrix - added in constants
 	W <- simData$W
 
+	K <- 4
 }
 
-## createa adjacency matrix 
+## createa adjacency matrix
 W_nimble = as.carAdjacency(W)
+
+## quantities used by the CAR models (ignored by models without a CAR prior)
+## C, M define the proper CAR parametrization; Cmatrix is used to standardize
+## the ability parameters
+CM      <- as.carCM(W_nimble$adj, W_nimble$weights, W_nimble$num)
+Cmatrix <- CAR_calcCmatrix(C = CM$C, adj = W_nimble$adj, num = W_nimble$num)
 
 ##---------------------------------------##
 ## Source model code, and definition of data, constants, inits
 source(args$model)
 ##---------------------------------------##
 
-# scores 			<- 
-# Sscores 		<- (scores - mean(scores))/sd(scores)
-# inits$eta 	<- Sscores
+## initialize students ability with raw scores
+## each model script declares which node holds the abilities: theta when it is
+## stochastic, thetaTmp for the CAR models where theta is deterministic
+if(!exists("abilityNode")) abilityNode <- "theta"
+
+Sscores 		  		 <- (scores - mean(scores))/sd(scores)
+inits[[abilityNode]] <- Sscores
 
 
 ##---------------------------------------------------##
@@ -94,41 +132,33 @@ model <- nimbleModel(code 			= modelCode,
 										 data 			= data,  
 										 constants	= constants,
 										 inits 			= inits, 
-										 calculate 	= FALSE)
+										 calculate 	= TRUE)
 
 ##---------------------------------------------------##
 ## SP: ?? SOME SETTING UNDECIDED - here in case we 
 ## are interested in setting up monitoring the log-likelihood
 ## or log posterior of the model
 ##---------------------------------------------------##
-
-
 ## update monitors - placeholder if we want to monitor the loklikelihood
 ## monitors <- c(monitors, "myLogProbAll", "myLogProbSome", "myLogLik")
 
-## Flag for WAIC
-# if(calcWAIC) {
-# ## conditional WAIC - grouped students
-#   if(grepl("timss", args$data)) {
-# 		indList <- split(seq_along(alldata$id), alldata$id)
-# 		groups <- sapply(indList, function(x)  paste0('y[', x, ']'))  
-#   }
-#   else {
-# 		groups <- paste0('y[', 1:constants$N, ', 1:', constants$I, ']')
-#   }
+# Flag for WAIC
+if(calcWAIC) {
+	## conditional WAIC - all the responses of a student form one observation,
+	## so that WAIC compares the models on predicting a new student rather
+	## than a new item response; this is what differs across the models
+	groups <- paste0('Y[', 1:constants$N, ', 1:', constants$nItems, ']')
 
+	mcmcConf <- configureMCMC(model, 
+		monitors = monitors, 
+		enableWAIC = TRUE, 
+		waicControl = list(dataGroups = groups))
 
-# 	mcmcConf <- configureMCMC(model, monitors = monitors, 
-# 		enableWAIC = TRUE, 
-# 		waicControl = list(dataGroups = groups))
+} else {
+	mcmcConf <- configureMCMC(model, monitors = monitors)
 
-# } else {
-# 	mcmcConf <- configureMCMC(model, monitors = monitors)
+}
 
-# }
-
-
-mcmcConf <- configureMCMC(model, monitors = monitors)
 mcmc <- buildMCMC(mcmcConf)	
 
 ##---------------------------------------------------##
@@ -149,48 +179,54 @@ compilationTime <- system.time({
 ## Run MCMC 
 ##---------------------------------------------------##
 runningTime <- system.time({try(
-	res <- runMCMC(Cmcmc, 
-				   niter 	= MCMCcontrol$niter, 
+	res <- runMCMC(Cmcmc,
+				   niter 	= MCMCcontrol$niter,
 				   nburnin  = MCMCcontrol$nburnin,
-				   setSeed  = seed)
+				   thin     = MCMCcontrol$nthin,
+				   setSeed  = seed,
+				   WAIC = calcWAIC)
 	)
 	if(inherits(res, 'try-error')) {
   		warning(paste0("There was a problem running nimble MCMC."))
   }
 })
 
-if(grepl("semi", args$model)) {
-  if(grepl("osce", args$data)) {
-    outputG <- getSamplesDPmeasure(Cmcmc)
-  }
-}
-
 ##---------------------------------------------------##
 ## Save results, times, settings
 ##---------------------------------------------------##
-results <- list(samples  = res,
+## runMCMC returns a list when WAIC = TRUE, keep results$samples a matrix
+if(calcWAIC) samples <- res$samples else samples <- res
+
+results <- list(samples  = samples,
 				compilationTime  = compilationTime,
-				samplingTime     = runningTime*(1 - MCMCcontrol$niter/MCMCcontrol$nburnin),
+				samplingTime     = runningTime*(1 - MCMCcontrol$nburnin/MCMCcontrol$niter),
 				runningTime      = runningTime,
 				MCMCcontrol      = MCMCcontrol)
 
-
-if(grepl("semi", args$model)) {
-  if(grepl("osce", args$data)) {
-    results$outputG <- outputG
-  }
+##---------------------------------------------------##
+## WAIC - both variants, computed on the same samples
+## grouped   : one observation is a student, i.e. all their responses.
+##             Sensitive to the prior on the abilities, which is what
+##             differs across the models.
+## pointwise : one observation is a single item response, nimble's default.
+##             Mostly reflects item fit.
+## Both are conditional on the sampled abilities. The two are on different
+## scales: compare models within a variant, never across variants.
+##---------------------------------------------------##
+if(calcWAIC) {
+	results$WAICgrouped   <- Cmcmc$getWAIC()
+	results$WAICpointwise <- calculateWAIC(samples, model)
 }
-
-if(calcWAIC) results$modelWAIC <- Cmcmc$getWAIC()$WAIC
 
 
 ##---------------------------------------------------##
 ## Set up directory names to save for output
 ##---------------------------------------------------##
-modelType       <- unlist(strsplit(basename(args$model), "[\\_\\.]"))[1]
+## the model file name already identifies the model, e.g.
+## output/sim_scenario1/GPCM_CAR.rds
 dataName        <- unlist(strsplit(basename(args$data), "[.]"))[1]
 
-outDir <- paste0(dir, "/", dataName, "/", modelType, "/")
+outDir <- paste0(dir, "/", dataName, "/")
 filenameOutput <- paste0(outDir, filename, ".rds")
 
 dir.create(file.path(outDir), 

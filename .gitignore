@@ -1,0 +1,13 @@
+## macOS
+.DS_Store
+
+## MCMC output and figures produced by the scripts
+output/
+figures/
+Rplots.pdf
+
+## R
+.Rhistory
+.RData
+.Rproj.user/
+*.Rproj

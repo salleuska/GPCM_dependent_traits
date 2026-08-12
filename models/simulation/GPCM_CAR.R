@@ -1,9 +1,17 @@
 ##-----------------------------------------#
-## PCM – Partial Credit Model with CAR prior
+## GPCM - Generalized Partial Credit Model
+## with CAR prior on the latent traits
 ##-----------------------------------------#
-
-library(nimble)
-
+## One exam, wide format: Y[i, j] is the score of student i on item j,
+## coded 1:K. Abilities follow a proper CAR prior over the network, and are
+## standardized by the marginal standard deviations implied by the CAR.
+##
+## multi exam version: models/application/GPCM_CAR.R
+## the block defining the latent traits must stay the same in the two files
+##
+## sourced by 1_runNimbleModel.R, which provides
+##   Y, K, W_nimble, CM, Cmatrix
+##-----------------------------------------#
 ## ---- Model code ----
 modelCode <- nimbleCode({
 
@@ -23,10 +31,10 @@ modelCode <- nimbleCode({
                               tau  = tau,
                               gamma= gamma)
 
-  ##  ## standardize ability parameters
-  # tmp[1:N, 1:N] <- inverse(Identity[1:N, 1:N] - gamma * Cmatrix[1:N, 1:N])
-  # Sigma[1:N, 1:N] <- tmp[1:N, 1:N] %*% Mmatrix[1:N, 1:N]
-  # SigmaDiag[1:N] <- diag(Sigma[1:N, 1:N])
+  #  ## standardize ability parameters
+  tmp[1:N, 1:N] <- inverse(Identity[1:N, 1:N] - gamma * Cmatrix[1:N, 1:N])
+  Sigma[1:N, 1:N] <- tmp[1:N, 1:N] %*% Mmatrix[1:N, 1:N]
+  SigmaDiag[1:N] <- diag(Sigma[1:N, 1:N])
 
   for(i in 1:N) {
     theta[i] <- thetaTmp[i] / sqrt(SigmaDiag[i])
@@ -74,11 +82,12 @@ modelCode <- nimbleCode({
 data <- list(Y = Y)
 
 ## ---- Constants ----
-## Assume W_nimble (from as.carAdjacency) and CM (from as.carCM) are available
+## Assume W_nimble (from as.carAdjacency), CM (from as.carCM) and Cmatrix
+## (from CAR_calcCmatrix) are available
 constants <- list(
   nItems = NCOL(data$Y),
   N      = NROW(data$Y),
-  K      = 4,
+  K      = K,
   mu     = rep(0, NROW(data$Y)),
   adj    = W_nimble$adj,
   num    = W_nimble$num,
@@ -86,7 +95,7 @@ constants <- list(
   tau    = 1,
   C      = CM$C,
   M      = CM$M,
-  Cmatrix = Cmatrix,   # computed outside with CAR_calcCmatrix
+  Cmatrix = Cmatrix,
   Mmatrix = diag(CM$M),
   Identity = diag(1, NROW(data$Y))
 )
@@ -99,6 +108,16 @@ inits <- list(
                     nrow = constants$nItems, ncol = constants$K),
   log_alpha= rep(log(1.5), constants$nItems)
 )
+
+## node holding the ability parameters that the runner initializes with the
+## raw scores; here theta is deterministic, so we initialize thetaTmp instead
+abilityNode <- "thetaTmp"
+
+## ---- Monitors ----
+## thetaTmp is monitored because the offline WAIC needs every stochastic
+## parent of the data nodes; theta itself is deterministic here
+
+monitors <- c("beta", "alpha", "theta", "thetaTmp", "log_alpha", "gamma")
 
 
 

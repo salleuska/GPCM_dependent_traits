@@ -1,9 +1,16 @@
 ##-----------------------------------------#
-## PCM – Partial Credit Model (wide format)
+## GPCM - Generalized Partial Credit Model
+## normal latent trait (wide format)
 ##-----------------------------------------#
-
-library(nimble)
-
+## Baseline model for the simulation study. One exam: Y[i, j] is the score of
+## student i on item j, coded 1:K. Abilities are independent N(0, 1), the
+## network is ignored.
+##
+## multi exam version: models/application/GPCM_normal.R
+##
+## sourced by 1_runNimbleModel.R, which provides
+##   Y, K
+##-----------------------------------------#
 ## ---- Model code ----
 modelCode <- nimbleCode({
 
@@ -57,24 +64,20 @@ data <- list(Y = Y)
 constants <- list(
   nItems = NCOL(data$Y),
   N      = NROW(data$Y),
-  K      = 4
+  K      = K
 )
 
 ## ---- Initial values ----
 inits <- list(
-  beta      = array(0, dim = c(constants$nItems, constants$K)),
-  log_alpha = rep(log(1.5), constants$nItems),
-  theta     = rnorm(constants$N, 0, 1),
-  alpha     = exp(rep(log(1.5), constants$nItems))
+  beta      = array(rnorm(constants$nItems*constants$K, 0, 2), 
+                     dim = c(constants$nItems, constants$K)),
+  theta     = rnorm(constants$N, 0, 1)
 )
-inits$beta <- array(0, dim = c(constants$nExam, constants$nItem, max(constants$K)))
-inits$log_alpha <- array(log(1.5), dim = c(constants$nExam, constants$nItem))
-inits$theta <- rnorm(constants$N, 0, 1)
-inits$alpha <- exp(inits$log_alpha)
+inits$log_alpha <- rep(log(1.5), constants$nItems)
 
 ## ---- Monitors ----
 
-monitors <- c("beta", "alpha", "theta")
+monitors <- c("beta", "alpha", "theta", "log_alpha")
 
 
 
