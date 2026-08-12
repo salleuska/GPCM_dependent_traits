@@ -84,5 +84,16 @@ Rscript 1_runNimbleModel.R  \
 --data=data/simulation/sim_scenario3.rds \
 --niter=10000 \
 --nburnin=5000 \
---nthin=1 
+--nthin=1
+
+#############################################
+## 2) RUN APPLICATION
+#############################################
+
+Rscript 1_runNimbleModel.R  \
+--model=models/students/GPCM_normal.R \
+--data=data/students/students.RData \
+--niter=10000 \
+--nburnin=5000 \
+--nthin=1
 

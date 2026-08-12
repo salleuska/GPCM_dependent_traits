@@ -6,7 +6,7 @@
 ## coded 1:K. Abilities follow a proper CAR prior over the network, and are
 ## standardized by the marginal standard deviations implied by the CAR.
 ##
-## multi exam version: models/application/GPCM_CAR.R
+## multi exam version: models/students/GPCM_CAR.R
 ## the block defining the latent traits must stay the same in the two files
 ##
 ## sourced by 1_runNimbleModel.R, which provides

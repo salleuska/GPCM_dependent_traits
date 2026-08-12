@@ -21,13 +21,19 @@ args <- R.utils::commandArgs(asValue=TRUE)
 ## Interface with the model scripts in models/
 ##
 ## this script defines, before sourcing the model script:
-##   Y            matrix of scores, students x items, coded 1:K
+##   dataType     "simulation" (one exam, wide format) or
+##                "students"   (several exams, long format)
+##   Y            scores, coded 1:K. A students x items matrix for the
+##                simulation, a vector with one row per response otherwise
 ##   scores       raw scores per student (used to initialize the abilities)
-##   K            number of response categories
-##   W            adjacency matrix of the network
+##   K            number of response categories. A scalar for the simulation,
+##                an exams x items matrix otherwise
+##   W            adjacency matrix of the network. For the students data it
+##                covers the connected students only
 ##   W_nimble     as.carAdjacency(W)
 ##   CM           as.carCM(...), the proper CAR parametrization
 ##   Cmatrix      CAR_calcCmatrix(...), used to standardize the abilities
+##   allData      the students data, only when dataType is "students"
 ##
 ## each model script must define:
 ##   modelCode    nimbleCode
@@ -35,8 +41,9 @@ args <- R.utils::commandArgs(asValue=TRUE)
 ##   constants    list of constants for nimbleModel
 ##   inits        list of initial values
 ##   monitors     parameters to monitor
-##   abilityNode  (optional) node initialized with the raw scores,
-##                defaults to "theta"
+##   abilityNode  (optional) node initialized with the raw scores, defaults
+##                to "theta"; set it to NULL to initialize the abilities
+##                within the model script
 ##-----------------------------------------##
 ## TMP - for testing the script
 ##-----------------------------------------##
@@ -87,6 +94,9 @@ cat("##--------------------------------##\n")
 ## Note: constants and inits are defined within each model script
 
 if(grepl("sim", args$data)) {
+	## one exam, wide format
+	dataType 		<- "simulation"
+
 	## simuled data contains also true values on simulation
 	simData 	<- readRDS(args$data)
 
@@ -99,6 +109,25 @@ if(grepl("sim", args$data)) {
 	W <- simData$W
 
 	K <- 4
+
+} else {
+	## students data: several exams, long format, one row per response.
+	## Students are ordered so that the connected ones come first, the last
+	## nIsolated students have no link in the network
+	dataType 		<- "students"
+
+	load(args$data)		## provides allData
+
+	## responses, already coded 1:K
+	Y 					<- allData$marks$y
+	## raw score of each student, over the single exam they sat
+	scores 			<- as.numeric(tapply(allData$marks$y, allData$marks$student, sum))
+
+	## adjacency matrix of the connected students only
+	W <- allData$networkMatrix
+
+	## number of categories of each exam and item
+	K <- allData$K[, -1] + 1
 }
 
 ## createa adjacency matrix
@@ -117,11 +146,15 @@ source(args$model)
 
 ## initialize students ability with raw scores
 ## each model script declares which node holds the abilities: theta when it is
-## stochastic, thetaTmp for the CAR models where theta is deterministic
+## stochastic, thetaTmp for the CAR models where theta is deterministic.
+## A model that sets abilityNode to NULL builds these inits itself, as the
+## application CAR models do, where the abilities are split between the
+## connected and the isolated students
 if(!exists("abilityNode")) abilityNode <- "theta"
 
-Sscores 		  		 <- (scores - mean(scores))/sd(scores)
-inits[[abilityNode]] <- Sscores
+Sscores <- (scores - mean(scores))/sd(scores)
+
+if(!is.null(abilityNode)) inits[[abilityNode]] <- Sscores
 
 
 ##---------------------------------------------------##
@@ -147,12 +180,27 @@ if(calcWAIC) {
 	## conditional WAIC - all the responses of a student form one observation,
 	## so that WAIC compares the models on predicting a new student rather
 	## than a new item response; this is what differs across the models
-	groups <- paste0('Y[', 1:constants$N, ', 1:', constants$nItems, ']')
+	if(dataType == "simulation") {
+		## wide format, one row of Y per student
+		groups <- paste0('Y[', 1:constants$N, ', 1:', constants$nItems, ']')
+	} else {
+		## long format, the rows of a student are scattered over Y, so each
+		## group is a vector of node names.
+		## Note: lapply, not sapply. Every student has the same number of
+		## responses, so sapply would return a matrix and the grouping would
+		## be silently ignored. unname because nimble compares the expanded
+		## node names to the data nodes with identical(), and the names left
+		## by split() alone make that comparison fail
+		indList <- split(seq_along(allData$marks$student), allData$marks$student)
+		groups  <- unname(lapply(indList, function(x) paste0('Y[', x, ']')))
+	}
 
-	mcmcConf <- configureMCMC(model, 
-		monitors = monitors, 
-		enableWAIC = TRUE, 
-		waicControl = list(dataGroups = groups))
+	## note: the argument is controlWAIC, a wrong name would be absorbed by
+	## the dots of configureMCMC and the grouping silently ignored
+	mcmcConf <- configureMCMC(model,
+		monitors = monitors,
+		enableWAIC = TRUE,
+		controlWAIC = list(dataGroups = groups))
 
 } else {
 	mcmcConf <- configureMCMC(model, monitors = monitors)

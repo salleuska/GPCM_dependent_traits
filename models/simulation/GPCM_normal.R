@@ -6,7 +6,7 @@
 ## student i on item j, coded 1:K. Abilities are independent N(0, 1), the
 ## network is ignored.
 ##
-## multi exam version: models/application/GPCM_normal.R
+## multi exam version: models/students/GPCM_normal.R
 ##
 ## sourced by 1_runNimbleModel.R, which provides
 ##   Y, K

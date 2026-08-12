@@ -7,7 +7,7 @@
 ## gamma ~ Unif(-1, 1) (network dependence). The posterior mean of g is the
 ## inclusion probability of the network effect.
 ##
-## multi exam version: models/application/GPCM_SSCAR.R
+## multi exam version: models/students/GPCM_SSCAR.R
 ## the block defining the latent traits must stay the same in the two files
 ##
 ## sourced by 1_runNimbleModel.R, which provides
