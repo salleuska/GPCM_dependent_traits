@@ -16,6 +16,7 @@ args <- R.utils::commandArgs(asValue=TRUE)
 ## niter        number of iterations for MCMC
 ## nburnin 			number of burnin iterations for MCMC
 ## nthin 				thinning (deafault is 1)
+## seed 				(optional) seed, defaults to 1 or to the slurm task id
 ## dirResults	  (optional) path directory for results
 ##-----------------------------------------##
 ## Interface with the model scripts in models/
@@ -78,9 +79,19 @@ MCMCcontrol$niter 	<- as.numeric(args$niter)
 MCMCcontrol$nburnin <- as.numeric(args$nburnin)
 if(is.null(args$nthin)) MCMCcontrol$nthin <- 1 else MCMCcontrol$nthin <- as.numeric(args$nthin)
 
-## set seed based on slurm task id if available
+## seed, from the argument if given, otherwise based on the slurm task id
 task_id <- Sys.getenv("SLURM_ARRAY_TASK_ID")
-if(task_id == "") seed <- 1 else seed <- 1 + as.numeric(task_id)
+
+if(!is.null(args$seed)) {
+	seed <- as.numeric(args$seed)
+} else if(task_id == "") {
+	seed <- 1
+} else {
+	seed <- 1 + as.numeric(task_id)
+}
+
+## the inits of some models draw random values, so fix the R seed too
+set.seed(seed)
 
 MCMCcontrol$seed <- seed
 
