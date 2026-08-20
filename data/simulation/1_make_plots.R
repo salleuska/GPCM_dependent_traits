@@ -1,7 +1,7 @@
 # -----------------------------------------#
 # make_plots.R
 # Consumes: sim_W.rds, sim_scenario1.rds, sim_scenario2.rds, sim_scenario3.rds
-# Produces: plots/simulationData.pdf
+# Produces: figures/simulationData.pdf
 # -----------------------------------------#
 
 library(dplyr)
@@ -78,5 +78,5 @@ simPlot <- plot_grid(
 )
 
 dir.create("plots", showWarnings = FALSE)
-save_plot("plots/simulationData.pdf", simPlot,
+save_plot("figures/simulationData.pdf", simPlot,
           base_width = 20, base_height = 10)

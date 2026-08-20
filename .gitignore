@@ -1,9 +1,10 @@
 ## macOS
 .DS_Store
 
-## MCMC output and figures produced by the scripts
+## MCMC output and run logs produced by the scripts
+## note: figures/ holds the figures of the paper and is tracked
 output/
-figures/
+logs/
 Rplots.pdf
 
 ## R

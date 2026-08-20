@@ -73,8 +73,8 @@ modelCode <- nimbleCode({
 
   ## Hyperpriors
   # tau ~ dgamma(0.001, 0.001)   # optional
-  gamma ~ dunif(-1, 1)
-
+  ## gamma ~ dunif(-1, 1)
+  gamma <- 0.98
 })
 
 ## ---- Data ----

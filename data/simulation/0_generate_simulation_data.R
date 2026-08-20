@@ -38,7 +38,7 @@ saveRDS(W, here("data/simulation/sim_W.rds"))
 ## Scenario 1: iid Normal(0,1)
 set.seed(123 + 1)
 Scenario1 <- lst()
-Scenario1$ability <- rnorm(N, 0, 1)
+Scenario1$ability <- as.vector(scale(rnorm(N, 0, 1)))
 
 ## Scenario 2: CAR model (rho = 0.98, sigma2 = 20)
 set.seed(123 + 2)
@@ -48,7 +48,9 @@ Scenario2$sigma2 <- 20
 D_w <- diag(colSums(W))
 Scenario2$Sigma_W <- solve((D_w - Scenario2$rho * W) / Scenario2$sigma2)
 Scenario2$ability <- c(rmvnorm(1, sigma = Scenario2$Sigma_W))
-Scenario2$ability <- Scenario2$ability / sqrt(diag(Scenario2$Sigma_W))
+## SP: if we scale it does not matter if we divide by the variance
+## Scenario2$ability <- Scenario2$ability / sqrt(diag(Scenario2$Sigma_W))
+Scenario2$ability <- as.vector(scale(Scenario2$ability))
 
 ## Scenario 3: Mixture of Normals by group
 set.seed(123 + 3)
@@ -64,6 +66,7 @@ for (i in 1:N) {
   Scenario3$ability[i] <- rnorm(1, Scenario3$trueAbilityMeans[g],
                                 sqrt(Scenario3$trueAbilityVars[g]))
 }
+Scenario3$ability <- as.vector(scale(Scenario3$ability))
 
 # -----------------------------------------#
 # 3) Item parameters (common to all scenarios)
@@ -72,7 +75,7 @@ Betas <- matrix(0, p, 4)
 for (i in 1:p) {
   Betas[i, 2:4] <- rnorm(3, 0, 2)
 }
-alphas <- runif(p, 0.5, 1)
+alphas <- runif(p, 0.5, 2)
 
 Scenario1$difficulties   <- Betas
 Scenario2$difficulties   <- Betas

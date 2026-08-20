@@ -6,7 +6,7 @@
 ## This scripts runs a nimble model
 ##
 ## Results are saved in
-##   <dirResults>/<data file name>/<model type>/<model file name>.rds
+##   <dirResults>/<data file name>/<model file name>.rds
 ##-----------------------------------------#
 args <- R.utils::commandArgs(asValue=TRUE)
 
@@ -274,7 +274,7 @@ results <- list(samples  = samples,
 ##---------------------------------------------------##
 if(calcWAIC) {
 	results$WAICgrouped   <- Cmcmc$getWAIC()
-	results$WAICpointwise <- calculateWAIC(samples, model)
+#	results$WAICpointwise <- calculateWAIC(samples, model)
 }
 
 
