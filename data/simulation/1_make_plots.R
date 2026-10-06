@@ -1,21 +1,24 @@
 # -----------------------------------------#
 # make_plots.R
-# Consumes: sim_W.rds, sim_scenario1.rds, sim_scenario2.rds, sim_scenario3.rds
-# Produces: figures/simulationData.pdf
+# Consumes: sim_W_<network>.rds, sim_<network>_scenario{1,2,3}.rds
+# Produces: figures/simulationData_<network>.pdf, network in {dense, sparse}
 # -----------------------------------------#
 
 library(dplyr)
 library(ggplot2)
 library(cowplot)
 library(tidyr)
+library(here)
+
+for (net in c("dense", "sparse")) {
 
 # -----------------------------------------#
 # Load saved data
 # -----------------------------------------#
-W         <- readRDS("sim_W.rds")
-Scenario1 <- readRDS("sim_scenario1.rds")
-Scenario2 <- readRDS("sim_scenario2.rds")
-Scenario3 <- readRDS("sim_scenario3.rds")
+W         <- readRDS(here(paste0("data/simulation/sim_W_", net, ".rds")))
+Scenario1 <- readRDS(here(paste0("data/simulation/sim_", net, "_scenario1.rds")))
+Scenario2 <- readRDS(here(paste0("data/simulation/sim_", net, "_scenario2.rds")))
+Scenario3 <- readRDS(here(paste0("data/simulation/sim_", net, "_scenario3.rds")))
 
 N <- nrow(W)
 groups <- c(rep(1, N/3), rep(2, N/3), rep(3, N/3))
@@ -77,6 +80,8 @@ simPlot <- plot_grid(
   labels = c("(a)", "")
 )
 
-dir.create("plots", showWarnings = FALSE)
-save_plot("figures/simulationData.pdf", simPlot,
+dir.create(here("figures"), showWarnings = FALSE)
+save_plot(here(paste0("figures/simulationData_", net, ".pdf")), simPlot,
           base_width = 20, base_height = 10)
+
+}

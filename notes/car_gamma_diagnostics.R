@@ -38,5 +38,5 @@ describe <- function(W, label) {
 load("data/students/students.RData")
 describe(allData$networkMatrix, "students network (connected)")
 
-sim <- readRDS("data/simulation/sim_scenario1.rds")
-describe(sim$W, "simulated SBM network")
+sim <- readRDS("data/simulation/sim_dense_scenario1.rds")
+describe(sim$W, "simulated SBM network (dense)")

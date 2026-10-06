@@ -7,11 +7,11 @@
 ##
 ##   Rscript notes/toy_identifiability/toy_check.R
 ##
-## Reads data/simulation/sim_W.rds read-only. Writes nothing.
+## Reads data/simulation/sim_W_dense.rds read-only. Writes nothing.
 ##-----------------------------------------#
 set.seed(1)
 
-W <- readRDS("../../data/simulation/sim_W.rds")
+W <- readRDS("../../data/simulation/sim_W_dense.rds")
 N <- nrow(W)
 d <- rowSums(W)
 stopifnot(all(d > 0))                      # no isolated nodes, else M breaks

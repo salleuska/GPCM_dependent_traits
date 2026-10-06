@@ -50,7 +50,7 @@ args <- R.utils::commandArgs(asValue=TRUE)
 ##-----------------------------------------##
 # args <- list()
 # args$model= "models/PCM_model.R"
-# args$data = "data/simulation/sim_scenario1.rds"
+# args$data = "data/simulation/sim_dense_scenario1.rds"
 # args$niter 		= 10
 # args$nburnin 	= 5
 # args$nthin 		= 1
@@ -285,7 +285,7 @@ if(calcWAIC) {
 ## Set up directory names to save for output
 ##---------------------------------------------------##
 ## the model file name already identifies the model, e.g.
-## output/sim_scenario1/GPCM_CAR.rds
+## output/sim_dense_scenario1/GPCM_CAR.rds
 dataName        <- unlist(strsplit(basename(args$data), "[.]"))[1]
 
 outDir <- paste0(dir, "/", dataName, "/")

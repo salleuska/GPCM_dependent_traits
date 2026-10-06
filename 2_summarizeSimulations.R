@@ -18,7 +18,7 @@ args <- R.utils::commandArgs(asValue=TRUE)
 ## TMP - for testing the script
 ##-----------------------------------------##
 # args <- list()
-# args$data = "data/simulation/sim_scenario1.rds"
+# args$data = "data/simulation/sim_dense_scenario1.rds"
 
 library(ggplot2)
 library(bayestestR)
