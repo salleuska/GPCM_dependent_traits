@@ -9,7 +9,7 @@
 ## multi exam version: models/students/GPCM_normal.R
 ##
 ## sourced by 1_runNimbleModel.R, which provides
-##   Y, K
+##   Y, K, and dGPCM (models/dGPCM.R)
 ##-----------------------------------------#
 ## ---- Model code ----
 modelCode <- nimbleCode({
@@ -17,31 +17,10 @@ modelCode <- nimbleCode({
   ## Observed responses
   for(i in 1:N) {
     for(j in 1:nItems) {
-      Y[i, j] ~ dcat(prob[i, j, 1:K])
+      Y[i, j] ~ dGPCM(theta[i], alpha[j], beta[j, 2:K])
     }
     ## Student ability
     theta[i] ~ dnorm(0, 1)
-  }
-
-  ## Linear predictor and cumulative logits
-  for(i in 1:N) {
-    for(j in 1:nItems) {
-      for(k in 1:K) {
-        eta[i, j, k]      <- alpha[j] * (theta[i] - beta[j, k])
-        psum[i, j, k]     <- sum(eta[i, j, 1:k])
-        exp.psum[i, j, k] <- exp(psum[i, j, k])
-      }
-    }
-  }
-
-  ## Normalizing probabilities
-  for(i in 1:N) {
-    for(j in 1:nItems) {
-      for(k in 1:K) {
-        prob[i, j, k] <- exp.psum[i, j, k] /
-                         sum(exp.psum[i, j, 1:K])
-      }
-    }
   }
 
   ## Priors for item parameters

@@ -151,6 +151,9 @@ CM      <- as.carCM(W_nimble$adj, W_nimble$weights, W_nimble$num)
 Cmatrix <- CAR_calcCmatrix(C = CM$C, adj = W_nimble$adj, num = W_nimble$num)
 
 ##---------------------------------------##
+## GPCM likelihood, dGPCM and rGPCM, used by all the model scripts
+source(here("models/dGPCM.R"))
+
 ## Source model code, and definition of data, constants, inits
 source(args$model)
 ##---------------------------------------##

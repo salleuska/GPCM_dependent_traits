@@ -11,34 +11,19 @@
 ## one exam version: models/simulation/GPCM_normal.R
 ##
 ## sourced by 1_runNimbleModel.R, which provides
-##   Y, K, allData
+##   Y, K, allData, and dGPCM (models/dGPCM.R)
 ##-----------------------------------------#
 
 modelCode <- nimbleCode({
 
   for(i in 1:ntot) {
-    Y[i] ~ dcat(prob[student[i], exam[i], item[i], 1:K[exam[i], item[i]] ])
+    Y[i] ~ dGPCM(theta[student[i]], alpha[exam[i], item[i]],
+                 beta[exam[i], item[i], 2:K[exam[i], item[i]]])
   }
 
   ## student ability
   for(i in 1:N){
     theta[i] ~ dnorm(0, 1)
-  }
-
-  for(i in 1:N) {
-    for(e in 1:nExam) {
-      for(j in 1:nItem) {
-        for(k in 1:K[e, j]) {
-          eta[i, e, j, k] <- alpha[e, j] * (theta[i] - beta[e, j, k])
-          psum[i, e, j, k] <- sum(eta[i, e, j, 1:k])
-          exp.psum[i, e, j, k] <- exp(psum[i, e, j, k])
-        }
-        
-        ## Normalizing probabilities
-        prob[i, e, j, 1:K[e, j]] <- exp.psum[i, e, j, 1:K[e, j]] / sum(exp.psum[i, e, j, 1:K[e, j]])
-      }
-
-    }
   }
 
   for(e in 1:nExam) {

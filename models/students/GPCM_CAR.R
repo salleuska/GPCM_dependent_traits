@@ -15,14 +15,15 @@
 ## the block defining the latent traits must stay the same in the two files
 ##
 ## sourced by 1_runNimbleModel.R, which provides
-##   Y, K, allData, W_nimble, CM, Cmatrix
+##   Y, K, allData, W_nimble, CM, Cmatrix, and dGPCM (models/dGPCM.R)
 ##-----------------------------------------#
 ## ---- Model code ----
 modelCode <- nimbleCode({
 
   ## Observed responses
   for(i in 1:ntot) {
-    Y[i] ~ dcat(prob[student[i], exam[i], item[i], 1:K[exam[i], item[i]] ])
+    Y[i] ~ dGPCM(theta[student[i]], alpha[exam[i], item[i]],
+                 beta[exam[i], item[i], 2:K[exam[i], item[i]]])
   }
 
   ## Individual latent variables with CAR structure
@@ -46,23 +47,6 @@ modelCode <- nimbleCode({
   ## independent normal distribution for isolated students
   for(i in (nConnected + 1):N) {
     theta[i] ~ dnorm(0, 1)
-  }
-
-  ## Linear predictor and cumulative logits
-  for(i in 1:N) {
-    for(e in 1:nExam) {
-      for(j in 1:nItem) {
-        for(k in 1:K[e, j]) {
-          eta[i, e, j, k]      <- alpha[e, j] * (theta[i] - beta[e, j, k])
-          psum[i, e, j, k]     <- sum(eta[i, e, j, 1:k])
-          exp.psum[i, e, j, k] <- exp(psum[i, e, j, k])
-        }
-
-        ## Normalizing probabilities
-        prob[i, e, j, 1:K[e, j]] <- exp.psum[i, e, j, 1:K[e, j]] /
-                                    sum(exp.psum[i, e, j, 1:K[e, j]])
-      }
-    }
   }
 
   ## Priors for item parameters
