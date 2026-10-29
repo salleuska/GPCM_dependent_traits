@@ -28,7 +28,7 @@ modelCode <- nimbleCode({
 
   for(e in 1:nExam) {
     for(j in 1:nItem){
-      log(alpha[e, j]) ~ dnorm(0.5, 0.5)
+      log(alpha[e, j]) ~ dnorm(0.5, var = 0.5)
       
       beta[e, j, 1] <- 0
 

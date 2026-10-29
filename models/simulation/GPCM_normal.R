@@ -25,7 +25,7 @@ modelCode <- nimbleCode({
 
   ## Priors for item parameters
   for(j in 1:nItems) {
-    log(alpha[j]) ~ dnorm(0.5, 0.5)
+    log(alpha[j]) ~ dnorm(0.5, var = 0.5)
 
     beta[j, 1] <- 0
     for (k in 2:K) {
