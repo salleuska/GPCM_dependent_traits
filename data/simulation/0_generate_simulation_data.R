@@ -1,163 +1,104 @@
 # -----------------------------------------#
-# simulate_data.R
-# Generates, for each network in {dense, sparse}:
-#   sim_W_<network>.rds, sim_<network>_scenario1.rds,
-#   sim_<network>_scenario2.rds, sim_<network>_scenario3.rds
-# Each scenario contains: $ability, $difficulties, $discrimination, $data,
-# $W, $network
-#
-# Networks, both stochastic block models with 3 blocks:
-#   dense   within 0.9,  between 0.1   (mean degree ~ 43, the original one)
-#   sparse  within 0.3,  between 0.02  (mean degree ~ 13, close to the
-#                                       students network, mean degree 11.6)
-#
-# Abilities have mean 0 and variance 1 *in distribution*. They are not
-# centered/scaled with scale(): that forces sample mean 0 and sample sd 1 on
-# each realization, and for scenario 2 it removes the common level shared by
-# all students, which is most of the dependence implied by the CAR
-# (see notes/toy_identifiability/PROBLEM.md).
-#
-# Scenarios 1 and 3 do not depend on the network: the abilities and the
-# responses are the same for both networks, only $W changes.
+# Simulated data, for network in {dense, sparse}:
+#   sim_W_<network>.rds, sim_<network>_scenario{1,2,3}.rds
+# Abilities have mean 0 and variance 1 by construction (no scale(), see
+# notes/toy_identifiability/PROBLEM.md). Scenarios 1 and 3 do not depend on
+# the network.
 # -----------------------------------------#
-
-library(dplyr)
-library(ggplot2)
 library(here)
-# -----------------------------------------#
-# Global setup
-# -----------------------------------------#
-N <- 120          # number of students
-p <- 10           # number of items
-set.seed(1234)
 
-# -----------------------------------------#
-# 1) Stochastic block adjacency matrices
-# -----------------------------------------#
-groups <- c(rep(1, N/3), rep(2, N/3), rep(3, N/3))
+N <- 120   # students
+p <- 10    # items
+groups <- rep(1:3, each = N/3)
 
-simulate_sbm <- function(groups, pWithin, pBetween) {
-  N <- length(groups)
+# ---- Networks: stochastic block models ----
+simulate_sbm <- function(pWithin, pBetween) {
   W <- matrix(0, N, N)
   for (i in 2:N) {
     for (j in 1:(i - 1)) {
-      W[i, j] <- ifelse(groups[i] == groups[j],
-                        rbinom(1, 1, pWithin),
-                        rbinom(1, 1, pBetween))
-      W[j, i] <- W[i, j]
+      W[i, j] <- W[j, i] <- rbinom(1, 1, ifelse(groups[i] == groups[j], pWithin, pBetween))
     }
   }
   W
 }
 
-## dense: same seed and code as the original sim_W.rds, so it is the same matrix
 Ws <- list()
-Ws$dense <- simulate_sbm(groups, 0.9, 0.1)
-
-## sparse: redraw until there are no isolated students, the proper CAR needs
-## every degree > 0 (M = 1 / degree)
+set.seed(1234)
+Ws$dense <- simulate_sbm(0.9, 0.1)    # mean degree ~43
 set.seed(4321)
-repeat {
-  Ws$sparse <- simulate_sbm(groups, 0.3, 0.02)
+repeat {                              # mean degree ~14, no isolated students
+  Ws$sparse <- simulate_sbm(0.3, 0.02)
   if (all(rowSums(Ws$sparse) > 0)) break
 }
 
-for (net in names(Ws)) {
-  saveRDS(Ws[[net]], here(paste0("data/simulation/sim_W_", net, ".rds")))
-  cat(net, "network: mean degree", round(mean(rowSums(Ws[[net]])), 1),
-      ", density", round(mean(Ws[[net]][upper.tri(Ws[[net]])]), 3), "\n")
-}
+# ---- Abilities ----
+## scenario 1: iid N(0, 1)
+set.seed(124)
+Scenario1 <- list(ability = rnorm(N))
 
-# -----------------------------------------#
-# 2) Latent abilities
-# -----------------------------------------#
-
-## Scenario 1: iid Normal(0,1)
-set.seed(123 + 1)
-Scenario1 <- lst()
-Scenario1$ability <- rnorm(N, 0, 1)
-
-## Scenario 2: CAR model (rho = 0.98, sigma2 = 20), one per network.
-## theta_i = x_i / sqrt(Sigma_ii) gives Var(theta_i) = 1 for every student
-## without constraining the realization; sigma2 cancels in the division.
-## The same standard normal draws z are used for both networks.
-set.seed(123 + 2)
+## scenario 2: CAR, divided by the marginal sd; same draws z for both networks
+set.seed(125)
 z <- rnorm(N)
-Scenario2 <- list()
-for (net in names(Ws)) {
-  S2 <- lst()
-  S2$rho     <- 0.98
-  S2$sigma2  <- 20
-  D_w        <- diag(colSums(Ws[[net]]))
-  S2$Sigma_W <- solve((D_w - S2$rho * Ws[[net]]) / S2$sigma2)
-  x          <- as.vector(t(chol(S2$Sigma_W)) %*% z)
-  S2$ability <- x / sqrt(diag(S2$Sigma_W))
-  Scenario2[[net]] <- S2
-}
+Scenario2 <- lapply(Ws, function(W) {
+  S <- list(rho = 0.98)
+  S$Sigma_W <- solve(diag(rowSums(W)) - S$rho * W)
+  S$ability <- as.vector(t(chol(S$Sigma_W)) %*% z) / sqrt(diag(S$Sigma_W))
+  S
+})
 
-## Scenario 3: Mixture of Normals by group. Group means (-0.5, 0, 0.5) and
-## within variance 5/6 give marginal mean 0 and variance 5/6 + 1/6 = 1
-set.seed(123 + 3)
-Scenario3 <- lst()
-Scenario3$trueAbilityMeans <- c(-0.5, 0, 0.5)
-Scenario3$trueAbilityVars  <- rep(5/6, 3)
-Scenario3$groups           <- groups
-
+## scenario 3: mixture by group, marginal variance 5/6 + 1/6 = 1
 set.seed(123)
-Scenario3$ability <- numeric(N)
-for (i in 1:N) {
-  g <- groups[i]
-  Scenario3$ability[i] <- rnorm(1, Scenario3$trueAbilityMeans[g],
-                                sqrt(Scenario3$trueAbilityVars[g]))
+Scenario3 <- list(trueAbilityMeans = c(-0.5, 0, 0.5),
+                  trueAbilityVars  = rep(5/6, 3),
+                  groups           = groups)
+Scenario3$ability <- rnorm(N, Scenario3$trueAbilityMeans[groups],
+                           sqrt(Scenario3$trueAbilityVars[groups]))
+
+# ---- Item parameters ----
+## steps ~ N(0, 1); an item is redrawn if a category has expected probability
+## below 8% for abilities N(mu, 1), mu in {-0.5, 0, 0.5}
+gpcm_probs <- function(theta, alpha, beta) {
+  num <- exp(cumsum(alpha * (theta - beta)))
+  num / sum(num)
+}
+min_expected_prob <- function(alpha, beta) {
+  min(sapply(c(-0.5, 0, 0.5), function(mu)
+    rowMeans(sapply(mu + qnorm(ppoints(200)), gpcm_probs, alpha, beta))))
 }
 
-# -----------------------------------------#
-# 3) Item parameters (common to all scenarios)
-# -----------------------------------------#
-Betas <- matrix(0, p, 4)
-for (i in 1:p) {
-  Betas[i, 2:4] <- rnorm(3, 0, 2)
-}
-alphas <- runif(p, 0.5, 2)
-
-# -----------------------------------------#
-# 4) Generate responses
-# -----------------------------------------#
-
-gen_responses <- function(N, p, ability, disc, diff) {
-  mat <- matrix(0, N, p)
-  for (i in 1:N) {
-    for (j in 1:p) {
-      num  <- exp(cumsum(disc[j] * (ability[i] - diff[j, ])))
-      den  <- sum(num)
-      prob <- num / den
-      mat[i, j] <- sample(0:3, size = 1, prob = prob)
-    }
+set.seed(3001)
+Betas  <- matrix(0, p, 4)
+alphas <- numeric(p)
+for (j in 1:p) {
+  repeat {
+    alphas[j]     <- runif(1, 0.5, 2)
+    Betas[j, 2:4] <- rnorm(3, 0, 1)
+    if (min_expected_prob(alphas[j], Betas[j, ]) >= 0.08) break
   }
-  mat
+}
+
+# ---- Responses, coded 0:3 ----
+gen_responses <- function(ability) {
+  t(sapply(ability, function(th)
+    sapply(1:p, function(j) sample(0:3, 1, prob = gpcm_probs(th, alphas[j], Betas[j, ])))))
 }
 
 set.seed(2001)
-Scenario1$data <- gen_responses(N, p, Scenario1$ability, alphas, Betas)
+Scenario1$data <- gen_responses(Scenario1$ability)
 set.seed(2003)
-Scenario3$data <- gen_responses(N, p, Scenario3$ability, alphas, Betas)
+Scenario3$data <- gen_responses(Scenario3$ability)
 for (net in names(Ws)) {
   set.seed(2002)
-  Scenario2[[net]]$data <- gen_responses(N, p, Scenario2[[net]]$ability,
-                                         alphas, Betas)
+  Scenario2[[net]]$data <- gen_responses(Scenario2[[net]]$ability)
 }
 
-# -----------------------------------------#
-# 5) Save, one file per network and scenario
-# -----------------------------------------#
+# ---- Save ----
 for (net in names(Ws)) {
+  saveRDS(Ws[[net]], here(paste0("data/simulation/sim_W_", net, ".rds")))
   scenarios <- list(Scenario1, Scenario2[[net]], Scenario3)
-  for (s in seq_along(scenarios)) {
-    sc <- scenarios[[s]]
-    sc$difficulties   <- Betas
-    sc$discrimination <- alphas
-    sc$W              <- Ws[[net]]
-    sc$network        <- net
+  for (s in 1:3) {
+    sc <- c(scenarios[[s]], list(difficulties = Betas, discrimination = alphas,
+                                 W = Ws[[net]], network = net))
     saveRDS(sc, here(paste0("data/simulation/sim_", net, "_scenario", s, ".rds")))
   }
 }
